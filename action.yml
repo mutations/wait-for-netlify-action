@@ -16,6 +16,9 @@ inputs:
   response_timeout:
     description: "The amount of time to spend waiting on the Netlify deployment to respond with a success HTTP code after reaching \"ready\" status. Defaults to 60 seconds."
     required: false
+  context:
+    description: "The Netlify deploy context. Can be branch-deploy, production or deploy-preview."
+    required: false
 outputs:
   deploy_id:
     description: "The Netlify deployment ID"

@@ -28,6 +28,10 @@ Optional — The amount of time to spend waiting on the Netlify deployment to re
 
 Optional — The amount of time to spend waiting on the Netlify deployment to respond with a success HTTP code after reaching "ready" status. Defaults to 60 seconds.
 
+### `context`
+
+Optional — The Netlify deploy context. Can be `branch-deploy`, `production` or `deploy-preview`. Defaults to all of them.
+
 ## Outputs
 
 ### `url`
