@@ -12,7 +12,7 @@ function getNetlifyUrl(url) {
   });
 }
 
-const waitForDeployCreation = (url, commitSha, MAX_TIMEOUT) => {
+const waitForDeployCreation = (url, commitSha, MAX_TIMEOUT, context) => {
   const increment = 15;
 
   return new Promise((resolve, reject) => {
@@ -32,7 +32,7 @@ const waitForDeployCreation = (url, commitSha, MAX_TIMEOUT) => {
         return reject(`Failed to get deployments for site`);
       }
 
-      const commitDeployment = netlifyDeployments.find((d) => d.commit_ref === commitSha);
+      const commitDeployment = netlifyDeployments.find((d) => d.commit_ref === commitSha && (!context || d.context === context));
 
       if (commitDeployment) {
         clearInterval(handle);
@@ -94,10 +94,13 @@ const run = async () => {
     const netlifyToken = process.env.NETLIFY_TOKEN;
     const commitSha =
       github.context.eventName === 'pull_request' ? github.context.payload.pull_request.head.sha : github.context.sha;
-    const MAX_CREATE_TIMEOUT = 60 * 5; // 5 min
-    const MAX_WAIT_TIMEOUT = 60 * 15; // 15 min
-    const MAX_READY_TIMEOUT = Number(core.getInput('max_timeout')) || 60;
+
+    const DEPLOY_TIMEOUT = Number(core.getInput('deploy_timeout')) || 60 * 5;
+    const READINESS_TIMEOUT = Number(core.getInput('readiness_timeout')) || 60 * 15;
+    // keep max_timeout for backwards compatibility
+    const RESPONSE_TIMEOUT = Number(core.getInput('response_timeout')) || Number(core.getInput('max_timeout')) || 60;
     const siteId = core.getInput('site_id');
+    const context = core.getInput('context');
 
     if (!netlifyToken) {
       core.setFailed('Please set NETLIFY_TOKEN env variable to your Netlify Personal Access Token secret');
@@ -109,11 +112,18 @@ const run = async () => {
       core.setFailed('Required field `site_id` was not provided');
     }
 
-    console.log(`Waiting for Netlify to create a deployment for git SHA ${commitSha}`);
+    let message = `Waiting for Netlify to create a deployment for git SHA ${commitSha}`;
+
+    if (context) {
+      message += ` and context ${context}`
+    }
+
+    console.log(message);
     const commitDeployment = await waitForDeployCreation(
       `https://api.netlify.com/api/v1/sites/${siteId}/deploys`,
       commitSha,
-      MAX_CREATE_TIMEOUT
+      DEPLOY_TIMEOUT,
+      context
     );
 
     const url = `https://${commitDeployment.id}--${commitDeployment.name}.netlify.app`;
@@ -124,11 +134,11 @@ const run = async () => {
     console.log(`Waiting for Netlify deployment ${commitDeployment.id} in site ${commitDeployment.name} to be ready`);
     await waitForReadiness(
       `https://api.netlify.com/api/v1/sites/${siteId}/deploys/${commitDeployment.id}`,
-      MAX_WAIT_TIMEOUT
+      READINESS_TIMEOUT
     );
 
     console.log(`Waiting for a 200 from: ${url}`);
-    await waitForUrl(url, MAX_READY_TIMEOUT);
+    await waitForUrl(url, RESPONSE_TIMEOUT);
   } catch (error) {
     core.setFailed(typeof error === 'string' ? error : error.message);
   }
