@@ -4,6 +4,8 @@
   "description": "A GitHub action that waits for a Netlify deployment preview for the current commit being built",
   "main": "index.js",
   "scripts": {
+    "lint": "eslint ./**/*.{js,ts}",
+    "lint:fix": "eslint --fix ./**/*.{js,ts}",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
