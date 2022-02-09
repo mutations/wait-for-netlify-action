@@ -1,0 +1,41 @@
+version: 2.1
+
+x-shared-config:
+  - &yarn_restore_cache
+    keys:
+      - yarn-v1-{{ .Branch }}-{{ checksum "yarn.lock" }}
+      - yarn-v1-{{ .Branch }}-
+      - yarn-v1-
+  - &yarn_save_cache
+    key: yarn-v1-{{ .Branch }}-{{ checksum "yarn.lock" }}
+    paths:
+      - ~/.cache/yarn
+
+executors:
+  node-docker:
+    docker:
+      - image: mutations/node:16.13.0-alpine3.14-2021-11-04
+
+jobs:
+  lint_and_test:
+    executor: node-docker
+    working_directory: ~/action
+    steps:
+      - checkout
+      - restore_cache: *yarn_restore_cache
+      - run:
+          name: Install dependencies
+          command: yarn install --cache-folder ~/.cache/yarn --frozen-lockfile
+      - save_cache: *yarn_save_cache
+      - run:
+          name: Run ESLint
+          command: yarn lint
+      - run:
+          name: Run Prettier
+          command: yarn prettier
+
+workflows:
+  version: 2
+  "Linters and Tests":
+    jobs:
+      - lint_and_test
