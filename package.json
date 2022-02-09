@@ -4,6 +4,7 @@
   "description": "A GitHub action that waits for a Netlify deployment preview for the current commit being built",
   "main": "index.js",
   "scripts": {
+    "build": "ncc build index.js -o dist --source-map --license licenses.txt",
     "lint": "eslint ./**/*.{js,ts}",
     "lint:fix": "eslint --fix ./**/*.{js,ts}",
     "prettier": "prettier --check './**/*.{js,ts}'",
