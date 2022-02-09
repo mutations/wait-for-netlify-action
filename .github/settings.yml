@@ -1,0 +1,38 @@
+# See https://developer.github.com/v3/repos/#edit for all available settings.
+repository:
+  allow_merge_commit: true
+  allow_rebase_merge: false
+  allow_squash_merge: false
+  default_branch: main
+  description: A GitHub action that will wait until a Netlify deploy is completed before continuing on
+  has_downloads: false
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  homepage: https://github.com/mutations/wait-for-netlify-action
+  name: wait-for-netlify-action
+  private: true
+
+# Labels: define labels for Issues and Pull Requests
+labels:
+  - name: ready-to-merge
+    color: 81f74f
+
+# https://developer.github.com/v3/repos/branches/#update-branch-protection
+branches:
+  - name: main
+    protection:
+      enforce_admins: true
+      required_pull_request_reviews:
+        dismiss_stale_reviews: true
+        dismissal_restrictions: {}
+        require_code_owner_reviews: false
+        required_approving_review_count: 1
+      # Required. Require status checks to pass before merging.
+      required_status_checks:
+        contexts:
+          - "ci/circleci: lint_and_test"
+          - WIP
+        strict: true
+      # Required. Enforce all configured restrictions for administrators.
+      restrictions: null
