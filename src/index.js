@@ -1,16 +1,9 @@
+import getNetlifyUrl from './get-netlify-url'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import axios from 'axios'
 
 const READY_STATES = ['ready', 'current']
-
-function getNetlifyUrl(url) {
-  return axios.get(url, {
-    headers: {
-      Authorization: `Bearer ${process.env.NETLIFY_TOKEN}`,
-    },
-  })
-}
 
 const waitForDeployCreation = (url, commitSha, MAX_TIMEOUT, context) => {
   const increment = 15
