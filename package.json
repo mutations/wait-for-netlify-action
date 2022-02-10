@@ -4,6 +4,11 @@
   "description": "A GitHub action that waits for a Netlify deployment preview for the current commit being built",
   "main": "index.js",
   "scripts": {
+    "build": "ncc build index.js -o dist --source-map --license licenses.txt",
+    "lint": "eslint ./**/*.{js,ts}",
+    "lint:fix": "eslint --fix ./**/*.{js,ts}",
+    "prettier": "prettier --check './**/*.{js,ts}'",
+    "prettier:fix": "prettier --write './**/*.{js,ts}'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -17,5 +22,11 @@
     "@actions/core": "1.6.0",
     "@actions/github": "5.0.0",
     "axios": "0.25.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.33.1",
+    "eslint": "^8.8.0",
+    "eslint-config-prettier": "^8.3.0",
+    "prettier": "^2.5.1"
   }
 }
