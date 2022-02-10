@@ -8,7 +8,9 @@ module.exports = {
   extends: ['eslint:recommended', 'prettier'],
   parserOptions: {
     ecmaVersion: 2018,
+    sourceType: 'module',
   },
+  plugins: ['import'],
   rules: {
     'no-alert': 'error',
     'no-console': 'off', // Actions use console.log
