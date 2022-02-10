@@ -1,48 +1,10 @@
 import getNetlifyUrl from './get-netlify-url'
+import waitForDeployCreation from './wait-for-deploy-creation'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import axios from 'axios'
 
 const READY_STATES = ['ready', 'current']
-
-const waitForDeployCreation = (url, commitSha, MAX_TIMEOUT, context) => {
-  const increment = 15
-
-  return new Promise((resolve, reject) => {
-    let elapsedTimeSeconds = 0
-
-    const handle = setInterval(async () => {
-      elapsedTimeSeconds += increment
-
-      if (elapsedTimeSeconds >= MAX_TIMEOUT) {
-        clearInterval(handle)
-
-        return reject(
-          `Timeout reached: Deployment was not created within ${MAX_TIMEOUT} seconds.`,
-        )
-      }
-
-      const { data: netlifyDeployments } = await getNetlifyUrl(url)
-
-      if (!netlifyDeployments) {
-        return reject(`Failed to get deployments for site`)
-      }
-
-      const commitDeployment = netlifyDeployments.find(
-        (d) =>
-          d.commit_ref === commitSha && (!context || d.context === context),
-      )
-
-      if (commitDeployment) {
-        clearInterval(handle)
-
-        return resolve(commitDeployment)
-      }
-
-      console.log(`Not yet created, waiting ${increment} more seconds...`)
-    }, increment * 1000)
-  })
-}
 
 const waitForReadiness = (url, MAX_TIMEOUT) => {
   const increment = 30
