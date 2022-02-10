@@ -1,0 +1,32 @@
+version: "3.5"
+
+x-shared-config:
+  base: &base
+    env_file:
+      - .env
+      - .env.local
+    stdin_open: true
+    tty: true
+    tmpfs:
+      - /tmp
+    user: "1069:1420"
+
+  image_name: &image_name
+    image: mutations/node:16.13.2-alpine3.15-2022-01-18
+
+  app_base: &app_base
+    <<: *base
+    <<: *image_name
+    environment:
+      - HISTFILE=/app/log/.bash_history
+      - NODE_ENV=${NODE_ENV:-development}
+    volumes:
+      - ./:/app:cached
+    working_dir: /app
+
+services:
+  app:
+    <<: *app_base
+    entrypoint: yarn
+    tmpfs:
+      - /tmp:exec,mode=755
