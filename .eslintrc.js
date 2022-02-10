@@ -10,7 +10,7 @@ module.exports = {
     ecmaVersion: 2018,
     sourceType: 'module',
   },
-  plugins: ['import'],
+  plugins: ['simple-import-sort', 'import'],
   rules: {
     'no-alert': 'error',
     'no-console': 'off', // Actions use console.log
@@ -50,5 +50,17 @@ module.exports = {
     ],
     'prefer-template': 'error',
     semi: ['error', 'never'],
+    'simple-import-sort/exports': 'error',
+    'simple-import-sort/imports': [
+      'error',
+      {
+        groups: [
+          // Non-side effect imports.
+          ['^[^\\u0000]'], // Side effect imports.
+          ['^\\u0000'],
+        ],
+      },
+    ],
+    'sort-imports': 'off',
   },
 }
