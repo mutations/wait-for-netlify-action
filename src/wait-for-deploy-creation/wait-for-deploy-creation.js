@@ -1,8 +1,12 @@
 import getNetlifyUrl from '../get-netlify-url'
 
-const waitForDeployCreation = (url, commitSha, MAX_TIMEOUT, context) => {
-  const increment = 15
-
+const waitForDeployCreation = (
+  url,
+  commitSha,
+  MAX_TIMEOUT,
+  context,
+  increment = 15,
+) => {
   return new Promise((resolve, reject) => {
     let elapsedTimeSeconds = 0
 
