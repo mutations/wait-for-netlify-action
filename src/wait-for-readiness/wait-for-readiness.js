@@ -2,9 +2,7 @@ import getNetlifyUrl from '../get-netlify-url'
 
 const READY_STATES = ['ready', 'current']
 
-const waitForReadiness = (url, MAX_TIMEOUT) => {
-  const increment = 30
-
+const waitForReadiness = (url, MAX_TIMEOUT, increment = 30) => {
   return new Promise((resolve, reject) => {
     let elapsedTimeSeconds = 0
     let state
