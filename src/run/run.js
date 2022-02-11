@@ -1,6 +1,6 @@
-import waitForDeployCreation from './wait-for-deploy-creation'
-import waitForReadiness from './wait-for-readiness'
-import waitForUrl from './wait-for-url'
+import waitForDeployCreation from '../wait-for-deploy-creation'
+import waitForReadiness from '../wait-for-readiness'
+import waitForUrl from '../wait-for-url'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 
