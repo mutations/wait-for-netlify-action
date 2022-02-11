@@ -1,2 +1,5 @@
-node_modules
 .env.local
+coverage
+node_modules
+tests/event.json
+tmp

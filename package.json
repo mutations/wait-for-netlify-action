@@ -4,12 +4,14 @@
   "description": "A GitHub action that waits for a Netlify deployment preview for the current commit being built",
   "main": "index.js",
   "scripts": {
-    "build": "ncc build index.js -o dist --source-map --license licenses.txt",
+    "build": "ncc build src/index.js -o dist --source-map --license licenses.txt",
     "lint": "eslint ./**/*.{js,ts}",
     "lint:fix": "eslint --fix ./**/*.{js,ts}",
     "prettier": "prettier --check './**/*.{js,ts}'",
     "prettier:fix": "prettier --write './**/*.{js,ts}'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:ci": "jest --ci --colors --maxWorkers=2",
+    "test:watch": "jest --watch"
   },
   "keywords": [
     "github-action",
@@ -24,9 +26,15 @@
     "axios": "0.25.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.17.2",
+    "@babel/preset-env": "^7.16.11",
     "@vercel/ncc": "^0.33.1",
+    "babel-jest": "^27.5.1",
     "eslint": "^8.8.0",
     "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-simple-import-sort": "^7.0.0",
+    "jest": "^27.5.1",
     "prettier": "^2.5.1"
   }
 }

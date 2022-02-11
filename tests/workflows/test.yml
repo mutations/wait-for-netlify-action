@@ -1,0 +1,21 @@
+# Sample workflow + job to test that the action works as expected
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: Test wait-for-netlify-action with act
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v2
+      - name: Run local action
+        id: netlify
+        uses: ./
+        env:
+          NETLIFY_TOKEN: ${{ env.NETLIFY_TOKEN }}
+        with:
+          site_id: ${{ env.NETLIFY_SITE_ID }}
+          deploy_timeout: 30
+          readiness_timeout: 45
+          response_timeout: 5
