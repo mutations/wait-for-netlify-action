@@ -20,7 +20,7 @@ const waitForReadiness = (url, MAX_TIMEOUT, increment = 30) => {
 
       const { data: deploy } = await getNetlifyUrl(url)
 
-      state = deploy.state
+      state = deploy && deploy.state
 
       if (READY_STATES.includes(state)) {
         clearInterval(handle)
