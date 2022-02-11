@@ -24,6 +24,8 @@ const waitForDeployCreation = (
       const { data: netlifyDeployments } = await getNetlifyUrl(url)
 
       if (!netlifyDeployments) {
+        clearInterval(handle)
+
         return reject(`Failed to get deployments for site`)
       }
 
