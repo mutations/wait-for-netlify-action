@@ -34,13 +34,17 @@ Optional — The Netlify deploy context. Can be `branch-deploy`, `production` or
 
 ## Outputs
 
-### `url`
-
-The Netlify deploy preview url that was deployed.
-
 ### `deploy_id`
 
 The Netlify deployment ID that was deployed.
+
+### `skipped`
+
+If the build was skipped. Will be set to the 'true' if skipped and 'false' if build succeeded.
+
+### `url`
+
+The Netlify deploy preview url that was deployed.
 
 ## Example usage
 
