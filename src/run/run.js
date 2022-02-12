@@ -65,10 +65,10 @@ const run = async () => {
     )
 
     if (state === STATE_SKIPPED) {
-      core.setOutput(STATE_SKIPPED, true)
+      core.setOutput(STATE_SKIPPED, 'true')
       console.log('Netlify build was skipped')
     } else {
-      core.setOutput(STATE_SKIPPED, false)
+      core.setOutput(STATE_SKIPPED, 'false')
       console.log(`Waiting for a 200 from: ${url}`)
       await waitForUrl(url, RESPONSE_TIMEOUT)
     }
