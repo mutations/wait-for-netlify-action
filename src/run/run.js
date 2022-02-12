@@ -57,13 +57,18 @@ const run = async () => {
     console.log(
       `Waiting for Netlify deployment ${commitDeployment.id} in site ${commitDeployment.name} to be ready`,
     )
-    await waitForReadiness(
+    const state = await waitForReadiness(
       `https://api.netlify.com/api/v1/sites/${siteId}/deploys/${commitDeployment.id}`,
       READINESS_TIMEOUT,
     )
 
-    console.log(`Waiting for a 200 from: ${url}`)
-    await waitForUrl(url, RESPONSE_TIMEOUT)
+    if (state === 'skipped') {
+      core.setOutput(state, true)
+      console.log('Netlify build was skipped')
+    } else {
+      console.log(`Waiting for a 200 from: ${url}`)
+      await waitForUrl(url, RESPONSE_TIMEOUT)
+    }
   } catch (error) {
     core.setFailed(typeof error === 'string' ? error : error.message)
   }
