@@ -22,6 +22,8 @@ inputs:
 outputs:
   deploy_id:
     description: "The Netlify deployment ID"
+  skipped:
+    description: "If the build was skipped. Will be set to 'true' if skipped."
   url:
     description: "The fully qualified deployment URL"
 runs:
