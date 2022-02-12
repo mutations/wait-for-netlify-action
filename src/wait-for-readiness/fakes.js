@@ -15,6 +15,11 @@ export const deployReady = {
   state: 'ready',
 }
 
+export const deploySkipped = {
+  ...deployError,
+  error_message: `Failed during stage 'checking build content for changes': Canceled build due to no content change`,
+}
+
 export const deployUnknown = {
   id: 'deploy-unknown',
   state: 'unknown',
