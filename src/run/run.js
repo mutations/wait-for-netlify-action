@@ -4,6 +4,8 @@ import waitForUrl from '../wait-for-url'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 
+const STATE_SKIPPED = 'skipped'
+
 const run = async () => {
   try {
     const netlifyToken = process.env.NETLIFY_TOKEN
@@ -62,10 +64,11 @@ const run = async () => {
       READINESS_TIMEOUT,
     )
 
-    if (state === 'skipped') {
-      core.setOutput(state, true)
+    if (state === STATE_SKIPPED) {
+      core.setOutput(STATE_SKIPPED, true)
       console.log('Netlify build was skipped')
     } else {
+      core.setOutput(STATE_SKIPPED, false)
       console.log(`Waiting for a 200 from: ${url}`)
       await waitForUrl(url, RESPONSE_TIMEOUT)
     }

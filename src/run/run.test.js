@@ -33,6 +33,7 @@ describe('index', () => {
     await run()
 
     expect(core.setOutput).toHaveBeenCalledWith('deploy_id', '1')
+    expect(core.setOutput).toHaveBeenCalledWith('skipped', false)
     expect(core.setOutput).toHaveBeenCalledWith(
       'url',
       'https://1--deploy-1.netlify.app',
