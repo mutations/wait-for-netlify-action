@@ -144,6 +144,7 @@ jobs:
 
 </details>
 
-<small>
-This is a heavily-modified fork of [kamranayub/wait-for-netlify-action](https://github.com/kamranayub/wait-for-netlify-action).
-</small>
+## Credits
+This is a heavily-modified fork of [probablyup/wait-for-netlify-action](https://github.com/probablyup/wait-for-netlify-action).
+
+The `wait-for-netlify-action` repo has been forked many times. You can see the [network members](https://github.com/mutations/wait-for-netlify-action/network/members) or take a look at the [network](https://github.com/mutations/wait-for-netlify-action/network) to find out more.
