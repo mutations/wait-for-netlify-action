@@ -1,4 +1,5 @@
 import getNetlifyUrl from '../get-netlify-url'
+import pRetry from 'p-retry'
 
 const ERROR_MESSAGES_FOR_SKIPPED_BUILDS = [
   `Failed during stage 'checking build content for changes': Canceled build due to no content change`,
@@ -6,46 +7,55 @@ const ERROR_MESSAGES_FOR_SKIPPED_BUILDS = [
 const ERROR_STATES = ['error']
 const READY_STATES = ['ready', 'current']
 
-const waitForReadiness = (url, MAX_TIMEOUT, increment = 30) => {
-  return new Promise((resolve, reject) => {
-    let elapsedTimeSeconds = 0
-    let state
-    let errorMessage
+const waitForReadiness = async (url, MAX_TIMEOUT) => {
+  const maxRetryTime = MAX_TIMEOUT * 1000
 
-    const handle = setInterval(async () => {
-      elapsedTimeSeconds += increment
+  /**
+   * checkForReadiness
+   *
+   * Function to check a Netlify deploy's state.
+   */
+  const checkForReadiness = async () => {
+    const { data: deploy } = await getNetlifyUrl(url)
 
-      if (elapsedTimeSeconds >= MAX_TIMEOUT) {
-        clearInterval(handle)
+    const state = deploy && deploy.state
+    const errorMessage = deploy && deploy.error_message
 
-        return reject(
-          `Timeout reached: Deployment was not ready within ${MAX_TIMEOUT} seconds. Last known deployment state: ${state}.`,
-        )
-      }
+    if (
+      ERROR_STATES.includes(state) &&
+      ERROR_MESSAGES_FOR_SKIPPED_BUILDS.includes(errorMessage)
+    ) {
+      return 'skipped'
+    }
 
-      const { data: deploy } = await getNetlifyUrl(url)
+    if (READY_STATES.includes(state)) {
+      return
+    }
 
-      state = deploy && deploy.state
-      errorMessage = deploy && deploy.error_message
+    // Each check can reject but pRetry will only return the last one
+    return Promise.reject(
+      new Error(
+        `Timeout reached: Deployment was not ready within ${MAX_TIMEOUT} seconds. Last known deployment state: ${state}.`,
+      ),
+    )
+  }
 
-      if (
-        ERROR_STATES.includes(state) &&
-        ERROR_MESSAGES_FOR_SKIPPED_BUILDS.includes(errorMessage)
-      ) {
-        clearInterval(handle)
-
-        return resolve('skipped')
-      }
-
-      if (READY_STATES.includes(state)) {
-        clearInterval(handle)
-
-        return resolve()
-      }
-
-      console.log(`Not yet ready, waiting ${increment} more seconds...`)
-    }, increment * 1000)
-  })
+  /**
+   * Retry checkForReadiness until ready, skipped, or the `MAX_TIMEOUT` is reached.
+   *
+   * Wrap in try/catch to preserve the previous API.
+   */
+  try {
+    return await pRetry(checkForReadiness, {
+      maxRetryTime,
+      maxTimeout: 120 * 1000,
+      onFailedAttempt: () => {
+        console.log(`Not yet ready, retrying for ${MAX_TIMEOUT} seconds...`)
+      },
+    })
+  } catch (error) {
+    return Promise.reject(error.message || error)
+  }
 }
 
 export default waitForReadiness

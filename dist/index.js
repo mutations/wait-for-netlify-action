@@ -12047,6 +12047,289 @@ function onceStrict (fn) {
 
 /***/ }),
 
+/***/ 4347:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports = __nccwpck_require__(6244);
+
+/***/ }),
+
+/***/ 6244:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+var RetryOperation = __nccwpck_require__(5369);
+
+exports.operation = function(options) {
+  var timeouts = exports.timeouts(options);
+  return new RetryOperation(timeouts, {
+      forever: options && (options.forever || options.retries === Infinity),
+      unref: options && options.unref,
+      maxRetryTime: options && options.maxRetryTime
+  });
+};
+
+exports.timeouts = function(options) {
+  if (options instanceof Array) {
+    return [].concat(options);
+  }
+
+  var opts = {
+    retries: 10,
+    factor: 2,
+    minTimeout: 1 * 1000,
+    maxTimeout: Infinity,
+    randomize: false
+  };
+  for (var key in options) {
+    opts[key] = options[key];
+  }
+
+  if (opts.minTimeout > opts.maxTimeout) {
+    throw new Error('minTimeout is greater than maxTimeout');
+  }
+
+  var timeouts = [];
+  for (var i = 0; i < opts.retries; i++) {
+    timeouts.push(this.createTimeout(i, opts));
+  }
+
+  if (options && options.forever && !timeouts.length) {
+    timeouts.push(this.createTimeout(i, opts));
+  }
+
+  // sort the array numerically ascending
+  timeouts.sort(function(a,b) {
+    return a - b;
+  });
+
+  return timeouts;
+};
+
+exports.createTimeout = function(attempt, opts) {
+  var random = (opts.randomize)
+    ? (Math.random() + 1)
+    : 1;
+
+  var timeout = Math.round(random * Math.max(opts.minTimeout, 1) * Math.pow(opts.factor, attempt));
+  timeout = Math.min(timeout, opts.maxTimeout);
+
+  return timeout;
+};
+
+exports.wrap = function(obj, options, methods) {
+  if (options instanceof Array) {
+    methods = options;
+    options = null;
+  }
+
+  if (!methods) {
+    methods = [];
+    for (var key in obj) {
+      if (typeof obj[key] === 'function') {
+        methods.push(key);
+      }
+    }
+  }
+
+  for (var i = 0; i < methods.length; i++) {
+    var method   = methods[i];
+    var original = obj[method];
+
+    obj[method] = function retryWrapper(original) {
+      var op       = exports.operation(options);
+      var args     = Array.prototype.slice.call(arguments, 1);
+      var callback = args.pop();
+
+      args.push(function(err) {
+        if (op.retry(err)) {
+          return;
+        }
+        if (err) {
+          arguments[0] = op.mainError();
+        }
+        callback.apply(this, arguments);
+      });
+
+      op.attempt(function() {
+        original.apply(obj, args);
+      });
+    }.bind(obj, original);
+    obj[method].options = options;
+  }
+};
+
+
+/***/ }),
+
+/***/ 5369:
+/***/ ((module) => {
+
+function RetryOperation(timeouts, options) {
+  // Compatibility for the old (timeouts, retryForever) signature
+  if (typeof options === 'boolean') {
+    options = { forever: options };
+  }
+
+  this._originalTimeouts = JSON.parse(JSON.stringify(timeouts));
+  this._timeouts = timeouts;
+  this._options = options || {};
+  this._maxRetryTime = options && options.maxRetryTime || Infinity;
+  this._fn = null;
+  this._errors = [];
+  this._attempts = 1;
+  this._operationTimeout = null;
+  this._operationTimeoutCb = null;
+  this._timeout = null;
+  this._operationStart = null;
+  this._timer = null;
+
+  if (this._options.forever) {
+    this._cachedTimeouts = this._timeouts.slice(0);
+  }
+}
+module.exports = RetryOperation;
+
+RetryOperation.prototype.reset = function() {
+  this._attempts = 1;
+  this._timeouts = this._originalTimeouts.slice(0);
+}
+
+RetryOperation.prototype.stop = function() {
+  if (this._timeout) {
+    clearTimeout(this._timeout);
+  }
+  if (this._timer) {
+    clearTimeout(this._timer);
+  }
+
+  this._timeouts       = [];
+  this._cachedTimeouts = null;
+};
+
+RetryOperation.prototype.retry = function(err) {
+  if (this._timeout) {
+    clearTimeout(this._timeout);
+  }
+
+  if (!err) {
+    return false;
+  }
+  var currentTime = new Date().getTime();
+  if (err && currentTime - this._operationStart >= this._maxRetryTime) {
+    this._errors.push(err);
+    this._errors.unshift(new Error('RetryOperation timeout occurred'));
+    return false;
+  }
+
+  this._errors.push(err);
+
+  var timeout = this._timeouts.shift();
+  if (timeout === undefined) {
+    if (this._cachedTimeouts) {
+      // retry forever, only keep last error
+      this._errors.splice(0, this._errors.length - 1);
+      timeout = this._cachedTimeouts.slice(-1);
+    } else {
+      return false;
+    }
+  }
+
+  var self = this;
+  this._timer = setTimeout(function() {
+    self._attempts++;
+
+    if (self._operationTimeoutCb) {
+      self._timeout = setTimeout(function() {
+        self._operationTimeoutCb(self._attempts);
+      }, self._operationTimeout);
+
+      if (self._options.unref) {
+          self._timeout.unref();
+      }
+    }
+
+    self._fn(self._attempts);
+  }, timeout);
+
+  if (this._options.unref) {
+      this._timer.unref();
+  }
+
+  return true;
+};
+
+RetryOperation.prototype.attempt = function(fn, timeoutOps) {
+  this._fn = fn;
+
+  if (timeoutOps) {
+    if (timeoutOps.timeout) {
+      this._operationTimeout = timeoutOps.timeout;
+    }
+    if (timeoutOps.cb) {
+      this._operationTimeoutCb = timeoutOps.cb;
+    }
+  }
+
+  var self = this;
+  if (this._operationTimeoutCb) {
+    this._timeout = setTimeout(function() {
+      self._operationTimeoutCb();
+    }, self._operationTimeout);
+  }
+
+  this._operationStart = new Date().getTime();
+
+  this._fn(this._attempts);
+};
+
+RetryOperation.prototype.try = function(fn) {
+  console.log('Using RetryOperation.try() is deprecated');
+  this.attempt(fn);
+};
+
+RetryOperation.prototype.start = function(fn) {
+  console.log('Using RetryOperation.start() is deprecated');
+  this.attempt(fn);
+};
+
+RetryOperation.prototype.start = RetryOperation.prototype.try;
+
+RetryOperation.prototype.errors = function() {
+  return this._errors;
+};
+
+RetryOperation.prototype.attempts = function() {
+  return this._attempts;
+};
+
+RetryOperation.prototype.mainError = function() {
+  if (this._errors.length === 0) {
+    return null;
+  }
+
+  var counts = {};
+  var mainError = null;
+  var mainErrorCount = 0;
+
+  for (var i = 0; i < this._errors.length; i++) {
+    var error = this._errors[i];
+    var message = error.message;
+    var count = (counts[message] || 0) + 1;
+
+    counts[message] = count;
+
+    if (count >= mainErrorCount) {
+      mainError = error;
+      mainErrorCount = count;
+    }
+  }
+
+  return mainError;
+};
+
+
+/***/ }),
+
 /***/ 9318:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -12754,143 +13037,324 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be in strict mode.
 (() => {
 "use strict";
+// ESM COMPAT FLAG
 __nccwpck_require__.r(__webpack_exports__);
-/* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(2186);
-/* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__nccwpck_require__.n(_actions_core__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _actions_github__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5438);
-/* harmony import */ var _actions_github__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__nccwpck_require__.n(_actions_github__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(6545);
-/* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__nccwpck_require__.n(axios__WEBPACK_IMPORTED_MODULE_2__);
 
+// EXTERNAL MODULE: ./node_modules/axios/index.js
+var axios = __nccwpck_require__(6545);
+var axios_default = /*#__PURE__*/__nccwpck_require__.n(axios);
+;// CONCATENATED MODULE: ./src/get-netlify-url/get-netlify-url.js
 
-
-
-const READY_STATES = ['ready', 'current']
 
 function getNetlifyUrl(url) {
-  return axios__WEBPACK_IMPORTED_MODULE_2___default().get(url, {
+  return axios_default().get(url, {
     headers: {
       Authorization: `Bearer ${process.env.NETLIFY_TOKEN}`,
     },
   })
 }
 
-const waitForDeployCreation = (url, commitSha, MAX_TIMEOUT, context) => {
-  const increment = 15
+/* harmony default export */ const get_netlify_url = (getNetlifyUrl);
 
-  return new Promise((resolve, reject) => {
-    let elapsedTimeSeconds = 0
+;// CONCATENATED MODULE: ./src/get-netlify-url/index.js
 
-    const handle = setInterval(async () => {
-      elapsedTimeSeconds += increment
 
-      if (elapsedTimeSeconds >= MAX_TIMEOUT) {
-        clearInterval(handle)
+// EXTERNAL MODULE: ./node_modules/retry/index.js
+var retry = __nccwpck_require__(4347);
+;// CONCATENATED MODULE: ./node_modules/p-retry/index.js
 
-        return reject(
-          `Timeout reached: Deployment was not created within ${MAX_TIMEOUT} seconds.`,
-        )
-      }
 
-      const { data: netlifyDeployments } = await getNetlifyUrl(url)
+const networkErrorMsgs = new Set([
+	'Failed to fetch', // Chrome
+	'NetworkError when attempting to fetch resource.', // Firefox
+	'The Internet connection appears to be offline.', // Safari
+	'Network request failed', // `cross-fetch`
+]);
 
-      if (!netlifyDeployments) {
-        return reject(`Failed to get deployments for site`)
-      }
+class AbortError extends Error {
+	constructor(message) {
+		super();
 
-      const commitDeployment = netlifyDeployments.find(
-        (d) =>
-          d.commit_ref === commitSha && (!context || d.context === context),
-      )
+		if (message instanceof Error) {
+			this.originalError = message;
+			({message} = message);
+		} else {
+			this.originalError = new Error(message);
+			this.originalError.stack = this.stack;
+		}
 
-      if (commitDeployment) {
-        clearInterval(handle)
-
-        return resolve(commitDeployment)
-      }
-
-      console.log(`Not yet created, waiting ${increment} more seconds...`)
-    }, increment * 1000)
-  })
+		this.name = 'AbortError';
+		this.message = message;
+	}
 }
 
-const waitForReadiness = (url, MAX_TIMEOUT) => {
-  const increment = 30
+const decorateErrorWithCounts = (error, attemptNumber, options) => {
+	// Minus 1 from attemptNumber because the first attempt does not count as a retry
+	const retriesLeft = options.retries - (attemptNumber - 1);
 
-  return new Promise((resolve, reject) => {
-    let elapsedTimeSeconds = 0
-    let state
+	error.attemptNumber = attemptNumber;
+	error.retriesLeft = retriesLeft;
+	return error;
+};
 
-    const handle = setInterval(async () => {
-      elapsedTimeSeconds += increment
+const isNetworkError = errorMessage => networkErrorMsgs.has(errorMessage);
 
-      if (elapsedTimeSeconds >= MAX_TIMEOUT) {
-        clearInterval(handle)
+async function pRetry(input, options) {
+	return new Promise((resolve, reject) => {
+		options = {
+			onFailedAttempt: () => {},
+			retries: 10,
+			...options,
+		};
 
-        return reject(
-          `Timeout reached: Deployment was not ready within ${MAX_TIMEOUT} seconds. Last known deployment state: ${state}.`,
-        )
-      }
+		const operation = retry.operation(options);
 
-      const { data: deploy } = await getNetlifyUrl(url)
+		operation.attempt(async attemptNumber => {
+			try {
+				resolve(await input(attemptNumber));
+			} catch (error) {
+				if (!(error instanceof Error)) {
+					reject(new TypeError(`Non-error was thrown: "${error}". You should only throw errors.`));
+					return;
+				}
 
-      state = deploy.state
+				if (error instanceof AbortError) {
+					operation.stop();
+					reject(error.originalError);
+				} else if (error instanceof TypeError && !isNetworkError(error.message)) {
+					operation.stop();
+					reject(error);
+				} else {
+					decorateErrorWithCounts(error, attemptNumber, options);
 
-      if (READY_STATES.includes(state)) {
-        clearInterval(handle)
+					try {
+						await options.onFailedAttempt(error);
+					} catch (error) {
+						reject(error);
+						return;
+					}
 
-        return resolve()
-      }
-
-      console.log(`Not yet ready, waiting ${increment} more seconds...`)
-    }, increment * 1000)
-  })
+					if (!operation.retry(error)) {
+						reject(operation.mainError());
+					}
+				}
+			}
+		});
+	});
 }
 
-const waitForUrl = async (url, MAX_TIMEOUT) => {
-  const iterations = MAX_TIMEOUT / 3
-  for (let i = 0; i < iterations; i++) {
-    try {
-      await axios__WEBPACK_IMPORTED_MODULE_2___default().get(url)
+;// CONCATENATED MODULE: ./src/wait-for-deploy-creation/wait-for-deploy-creation.js
 
-      return
-    } catch (e) {
-      console.log(`URL ${url} unavailable, retrying...`)
-      await new Promise((r) => setTimeout(r, 3000))
+
+
+const waitForDeployCreation = async (url, commitSha, MAX_TIMEOUT, context) => {
+  const maxRetryTime = MAX_TIMEOUT * 1000
+
+  /**
+   * checkForDeploy
+   *
+   * Function to check Netlify for a specific deploy.
+   */
+  const checkForDeploy = async () => {
+    const { data: netlifyDeployments } = await get_netlify_url(url)
+
+    if (!netlifyDeployments) {
+      throw new AbortError('Failed to get deployments for site')
     }
+
+    const commitDeployment = netlifyDeployments.find(
+      (d) => d.commit_ref === commitSha && (!context || d.context === context),
+    )
+
+    if (commitDeployment) {
+      return commitDeployment
+    }
+
+    // Each check can reject but pRetry will only return the last one
+    return Promise.reject(
+      new Error(
+        `Timeout reached: Deployment was not created within ${MAX_TIMEOUT} seconds.`,
+      ),
+    )
   }
-  _actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed(`Timeout reached: Unable to connect to ${url}`)
+
+  /**
+   * Retry checkForDeploy until found or the `MAX_TIMEOUT` is reached.
+   *
+   * Wrap in try/catch to preserve the previous API.
+   */
+  try {
+    return await pRetry(checkForDeploy, {
+      maxRetryTime,
+      maxTimeout: 120 * 1000,
+      onFailedAttempt: () => {
+        console.log(`Not yet created, retrying for ${MAX_TIMEOUT} seconds...`)
+      },
+    })
+  } catch (error) {
+    return Promise.reject(error.message || error)
+  }
 }
+
+/* harmony default export */ const wait_for_deploy_creation = (waitForDeployCreation);
+
+;// CONCATENATED MODULE: ./src/wait-for-deploy-creation/index.js
+
+
+;// CONCATENATED MODULE: ./src/wait-for-readiness/wait-for-readiness.js
+
+
+
+const ERROR_MESSAGES_FOR_SKIPPED_BUILDS = [
+  `Failed during stage 'checking build content for changes': Canceled build due to no content change`,
+]
+const ERROR_STATES = ['error']
+const READY_STATES = ['ready', 'current']
+
+const waitForReadiness = async (url, MAX_TIMEOUT) => {
+  const maxRetryTime = MAX_TIMEOUT * 1000
+
+  /**
+   * checkForReadiness
+   *
+   * Function to check a Netlify deploy's state.
+   */
+  const checkForReadiness = async () => {
+    const { data: deploy } = await get_netlify_url(url)
+
+    const state = deploy && deploy.state
+    const errorMessage = deploy && deploy.error_message
+
+    if (
+      ERROR_STATES.includes(state) &&
+      ERROR_MESSAGES_FOR_SKIPPED_BUILDS.includes(errorMessage)
+    ) {
+      return 'skipped'
+    }
+
+    if (READY_STATES.includes(state)) {
+      return
+    }
+
+    // Each check can reject but pRetry will only return the last one
+    return Promise.reject(
+      new Error(
+        `Timeout reached: Deployment was not ready within ${MAX_TIMEOUT} seconds. Last known deployment state: ${state}.`,
+      ),
+    )
+  }
+
+  /**
+   * Retry checkForReadiness until ready, skipped, or the `MAX_TIMEOUT` is reached.
+   *
+   * Wrap in try/catch to preserve the previous API.
+   */
+  try {
+    return await pRetry(checkForReadiness, {
+      maxRetryTime,
+      maxTimeout: 120 * 1000,
+      onFailedAttempt: () => {
+        console.log(`Not yet ready, retrying for ${MAX_TIMEOUT} seconds...`)
+      },
+    })
+  } catch (error) {
+    return Promise.reject(error.message || error)
+  }
+}
+
+/* harmony default export */ const wait_for_readiness = (waitForReadiness);
+
+;// CONCATENATED MODULE: ./src/wait-for-readiness/index.js
+
+
+// EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
+var core = __nccwpck_require__(2186);
+;// CONCATENATED MODULE: ./src/wait-for-url/wait-for-url.js
+
+
+
+
+const waitForUrl = async (url, MAX_TIMEOUT = 60) => {
+  const maxRetryTime = MAX_TIMEOUT * 1000
+
+  /**
+   * checkForUrl
+   *
+   * Function to check for a URL.
+   */
+  const checkForUrl = async () => {
+    await axios_default().get(url)
+
+    // Return `undefined` to preserve the previous API
+    return
+  }
+
+  /**
+   * Retry checkForUrl until found or `MAX_TIMEOUT` is reached.
+   *
+   * Wrap in try/catch to preserve the previous API.
+   */
+  try {
+    return await pRetry(checkForUrl, {
+      maxRetryTime,
+      maxTimeout: 120 * 1000,
+      onFailedAttempt: () => {
+        console.log(`URL ${url} unavailable, retrying...`)
+      },
+    })
+  } catch (error) {
+    core.setFailed(`Timeout reached: Unable to connect to ${url}`)
+
+    // Previous API resolves even when the URL is not found.
+    return Promise.resolve()
+  }
+}
+
+/* harmony default export */ const wait_for_url = (waitForUrl);
+
+;// CONCATENATED MODULE: ./src/wait-for-url/index.js
+
+
+// EXTERNAL MODULE: ./node_modules/@actions/github/lib/github.js
+var github = __nccwpck_require__(5438);
+;// CONCATENATED MODULE: ./src/run/run.js
+
+
+
+
+
+
+const STATE_SKIPPED = 'skipped'
 
 const run = async () => {
   try {
     const netlifyToken = process.env.NETLIFY_TOKEN
     const commitSha =
-      _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.eventName === 'pull_request'
-        ? _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.payload.pull_request.head.sha
-        : _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.sha
+      github.context.eventName === 'pull_request'
+        ? github.context.payload.pull_request.head.sha
+        : github.context.sha
 
-    const DEPLOY_TIMEOUT = Number(_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('deploy_timeout')) || 60 * 5
+    const DEPLOY_TIMEOUT = Number(core.getInput('deploy_timeout')) || 60 * 5
     const READINESS_TIMEOUT =
-      Number(_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('readiness_timeout')) || 60 * 15
+      Number(core.getInput('readiness_timeout')) || 60 * 15
     // keep max_timeout for backwards compatibility
     const RESPONSE_TIMEOUT =
-      Number(_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('response_timeout')) ||
-      Number(_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('max_timeout')) ||
+      Number(core.getInput('response_timeout')) ||
+      Number(core.getInput('max_timeout')) ||
       60
-    const siteId = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('site_id')
-    const context = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('context')
+    const siteId = core.getInput('site_id')
+    const context = core.getInput('context')
 
     if (!netlifyToken) {
-      _actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed(
+      core.setFailed(
         'Please set NETLIFY_TOKEN env variable to your Netlify Personal Access Token secret',
       )
     }
     if (!commitSha) {
-      _actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed('Could not determine GitHub commit')
+      core.setFailed('Could not determine GitHub commit')
     }
     if (!siteId) {
-      _actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed('Required field `site_id` was not provided')
+      core.setFailed('Required field `site_id` was not provided')
     }
 
     let message = `Waiting for Netlify to create a deployment for git SHA ${commitSha}`
@@ -12900,7 +13364,7 @@ const run = async () => {
     }
 
     console.log(message)
-    const commitDeployment = await waitForDeployCreation(
+    const commitDeployment = await wait_for_deploy_creation(
       `https://api.netlify.com/api/v1/sites/${siteId}/deploys`,
       commitSha,
       DEPLOY_TIMEOUT,
@@ -12909,25 +13373,39 @@ const run = async () => {
 
     const url = `https://${commitDeployment.id}--${commitDeployment.name}.netlify.app`
 
-    _actions_core__WEBPACK_IMPORTED_MODULE_0__.setOutput('deploy_id', commitDeployment.id)
-    _actions_core__WEBPACK_IMPORTED_MODULE_0__.setOutput('url', url)
+    core.setOutput('deploy_id', commitDeployment.id)
+    core.setOutput('url', url)
 
     console.log(
       `Waiting for Netlify deployment ${commitDeployment.id} in site ${commitDeployment.name} to be ready`,
     )
-    await waitForReadiness(
+    const state = await wait_for_readiness(
       `https://api.netlify.com/api/v1/sites/${siteId}/deploys/${commitDeployment.id}`,
       READINESS_TIMEOUT,
     )
 
-    console.log(`Waiting for a 200 from: ${url}`)
-    await waitForUrl(url, RESPONSE_TIMEOUT)
+    if (state === STATE_SKIPPED) {
+      core.setOutput(STATE_SKIPPED, 'true')
+      console.log('Netlify build was skipped')
+    } else {
+      core.setOutput(STATE_SKIPPED, 'false')
+      console.log(`Waiting for a 200 from: ${url}`)
+      await wait_for_url(url, RESPONSE_TIMEOUT)
+    }
   } catch (error) {
-    _actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed(typeof error === 'string' ? error : error.message)
+    core.setFailed(typeof error === 'string' ? error : error.message)
   }
 }
 
-run()
+/* harmony default export */ const run_run = (run);
+
+;// CONCATENATED MODULE: ./src/run/index.js
+
+
+;// CONCATENATED MODULE: ./src/index.js
+
+
+run_run()
 
 })();
 
