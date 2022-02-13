@@ -4,6 +4,8 @@ import waitForUrl from '../wait-for-url'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 
+const STATE_SKIPPED = 'skipped'
+
 const run = async () => {
   try {
     const netlifyToken = process.env.NETLIFY_TOKEN
@@ -57,13 +59,19 @@ const run = async () => {
     console.log(
       `Waiting for Netlify deployment ${commitDeployment.id} in site ${commitDeployment.name} to be ready`,
     )
-    await waitForReadiness(
+    const state = await waitForReadiness(
       `https://api.netlify.com/api/v1/sites/${siteId}/deploys/${commitDeployment.id}`,
       READINESS_TIMEOUT,
     )
 
-    console.log(`Waiting for a 200 from: ${url}`)
-    await waitForUrl(url, RESPONSE_TIMEOUT)
+    if (state === STATE_SKIPPED) {
+      core.setOutput(STATE_SKIPPED, 'true')
+      console.log('Netlify build was skipped')
+    } else {
+      core.setOutput(STATE_SKIPPED, 'false')
+      console.log(`Waiting for a 200 from: ${url}`)
+      await waitForUrl(url, RESPONSE_TIMEOUT)
+    }
   } catch (error) {
     core.setFailed(typeof error === 'string' ? error : error.message)
   }

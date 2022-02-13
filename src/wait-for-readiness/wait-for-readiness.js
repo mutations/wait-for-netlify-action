@@ -1,11 +1,16 @@
 import getNetlifyUrl from '../get-netlify-url'
 
+const ERROR_MESSAGES_FOR_SKIPPED_BUILDS = [
+  `Failed during stage 'checking build content for changes': Canceled build due to no content change`,
+]
+const ERROR_STATES = ['error']
 const READY_STATES = ['ready', 'current']
 
 const waitForReadiness = (url, MAX_TIMEOUT, increment = 30) => {
   return new Promise((resolve, reject) => {
     let elapsedTimeSeconds = 0
     let state
+    let errorMessage
 
     const handle = setInterval(async () => {
       elapsedTimeSeconds += increment
@@ -21,6 +26,16 @@ const waitForReadiness = (url, MAX_TIMEOUT, increment = 30) => {
       const { data: deploy } = await getNetlifyUrl(url)
 
       state = deploy && deploy.state
+      errorMessage = deploy && deploy.error_message
+
+      if (
+        ERROR_STATES.includes(state) &&
+        ERROR_MESSAGES_FOR_SKIPPED_BUILDS.includes(errorMessage)
+      ) {
+        clearInterval(handle)
+
+        return resolve('skipped')
+      }
 
       if (READY_STATES.includes(state)) {
         clearInterval(handle)

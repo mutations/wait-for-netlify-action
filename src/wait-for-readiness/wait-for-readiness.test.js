@@ -28,6 +28,14 @@ describe('waitForReadiness', () => {
     ).resolves.toEqual()
   })
 
+  it('succeeds when the deployment is `skipped`', async () => {
+    getNetlifyUrl.mockImplementation(() => ({ data: fakes.deploySkipped }))
+
+    await expect(
+      waitForReadiness(url, maxTimeout, intervalIncrement),
+    ).resolves.toEqual('skipped')
+  })
+
   it('fails after reaching the max timeout when the deployment is not ready', async () => {
     const deploy = fakes.deployUnknown
     getNetlifyUrl.mockImplementation(() => ({ data: deploy }))

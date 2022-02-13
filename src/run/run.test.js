@@ -33,10 +33,29 @@ describe('index', () => {
     await run()
 
     expect(core.setOutput).toHaveBeenCalledWith('deploy_id', '1')
+    expect(core.setOutput).toHaveBeenCalledWith('skipped', 'false')
     expect(core.setOutput).toHaveBeenCalledWith(
       'url',
       'https://1--deploy-1.netlify.app',
     )
+    expect(core.setFailed).not.toHaveBeenCalled()
+  })
+
+  it('succeeds when a deployment is skipped', async () => {
+    setupMockInputs({
+      site_id: 'site-id-skipped',
+    })
+
+    waitForDeployCreation.mockImplementation(() => fakes.deploy)
+    waitForReadiness.mockImplementation(() => 'skipped')
+
+    setGithubContext(fakes.githubContextPullRequestWithSha)
+
+    process.env.NETLIFY_TOKEN = 'token'
+
+    await run()
+
+    expect(core.setOutput).toHaveBeenCalledWith('skipped', 'true')
     expect(core.setFailed).not.toHaveBeenCalled()
   })
 
