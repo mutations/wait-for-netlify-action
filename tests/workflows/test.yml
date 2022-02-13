@@ -16,9 +16,6 @@ jobs:
           NETLIFY_TOKEN: ${{ env.NETLIFY_TOKEN }}
         with:
           site_id: ${{ env.NETLIFY_SITE_ID }}
-          deploy_timeout: 17
-          readiness_timeout: 32
-          response_timeout: 6
       - name: Echo output deploy_id
         run: echo ${{ steps.netlify.outputs.deploy_id }}
       - name: Echo output skipped
