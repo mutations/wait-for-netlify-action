@@ -6,10 +6,8 @@ jest.mock('../get-netlify-url')
 
 // URL doesn't matter since the call is mocked
 const url = 'https://some-netlify-url'
-// Shorten the setInterval increment during test
-const intervalIncrement = 0.25
 // Shorten the timeout during test
-const maxTimeout = 0.5
+const maxTimeout = 0.25
 
 describe('waitForDeployCreation', () => {
   it('succeeds when it finds the deployment for the site', async () => {
@@ -18,13 +16,7 @@ describe('waitForDeployCreation', () => {
     getNetlifyUrl.mockImplementation(() => ({ data: fakes.deploys }))
 
     await expect(
-      waitForDeployCreation(
-        url,
-        commitSha,
-        maxTimeout,
-        null,
-        intervalIncrement,
-      ),
+      waitForDeployCreation(url, commitSha, maxTimeout, null),
     ).resolves.toEqual(fakes.deploy1)
   })
 
@@ -34,13 +26,7 @@ describe('waitForDeployCreation', () => {
     getNetlifyUrl.mockImplementation(() => ({ data: fakes.emptyApiResult }))
 
     await expect(
-      waitForDeployCreation(
-        url,
-        commitSha,
-        maxTimeout,
-        null,
-        intervalIncrement,
-      ),
+      waitForDeployCreation(url, commitSha, maxTimeout, null),
     ).rejects.toEqual('Failed to get deployments for site')
   })
 
@@ -50,13 +36,7 @@ describe('waitForDeployCreation', () => {
     getNetlifyUrl.mockImplementation(() => ({ data: fakes.deploys }))
 
     await expect(
-      waitForDeployCreation(
-        url,
-        commitSha,
-        maxTimeout,
-        null,
-        intervalIncrement,
-      ),
+      waitForDeployCreation(url, commitSha, maxTimeout, null),
     ).rejects.toEqual(
       `Timeout reached: Deployment was not created within ${maxTimeout} seconds.`,
     )
@@ -70,13 +50,7 @@ describe('waitForDeployCreation', () => {
       getNetlifyUrl.mockImplementation(() => ({ data: fakes.deploys }))
 
       await expect(
-        waitForDeployCreation(
-          url,
-          commitSha,
-          maxTimeout,
-          context,
-          intervalIncrement,
-        ),
+        waitForDeployCreation(url, commitSha, maxTimeout, context),
       ).resolves.toEqual(fakes.deploy2)
     })
 
@@ -87,14 +61,10 @@ describe('waitForDeployCreation', () => {
       getNetlifyUrl.mockImplementation(() => ({ data: fakes.deploys }))
 
       await expect(
-        waitForDeployCreation(
-          url,
-          commitSha,
-          maxTimeout,
-          context,
-          intervalIncrement,
-        ),
-      ).rejects.toMatch('Timeout reached')
+        waitForDeployCreation(url, commitSha, maxTimeout, context),
+      ).rejects.toEqual(
+        `Timeout reached: Deployment was not created within ${maxTimeout} seconds.`,
+      )
     })
   })
 })
