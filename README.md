@@ -144,6 +144,18 @@ jobs:
 
 </details>
 
+## Versioning
+
+This project uses [Calver](https://calver.org) to version the apps and builds. The version format is: `YY.0M.MICRO`.
+
+Examples:
+  - `22.01.1` - First released build in January of 2022
+  - `22.02.15` - Fifteenth release in February of 2022
+  - `22.03-beta` - Beta release of the March 2022 build
+  - `22.03.4-beta` - Beta release of the fourth build in March 2022
+
+Where `Version` is the two-digit year, the zero-padded two-digit month, and a micro segment to indicate the build number for that month. An optional `-MODIFIER` can be used for pre-release, alpha, beta, and the like.
+
 <small>
 This is a heavily-modified fork of [kamranayub/wait-for-netlify-action](https://github.com/kamranayub/wait-for-netlify-action).
 </small>
